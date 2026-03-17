@@ -27,4 +27,4 @@ CivicPay Shield modernizes this administrative workflow. We provide a transparen
 * **Frans Anthony** - Backend & Security Lead
 * **Blackiee** - Frontend Developer
 * **Abdul-Rahman** - UI/UX Designer
-* **HomoJem** - Product Manager
+* **Toyibat** - Product Manager
