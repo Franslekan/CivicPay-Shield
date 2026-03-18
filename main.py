@@ -1,256 +1,39 @@
-import datetime
-import uuid
-import os
-import base64
-import requests
-
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-from passlib.context import CryptContext
-from jose import jwt, JWTError
 
-# Import our database tools
-from database import TransactionDB, UserDB, get_db
+# Create the app instance FIRST
+app = FastAPI()
 
-# Load the secret environment variables securely
-load_dotenv()
-
-app = FastAPI(
-    title="CivicPay Shield API",
-    description="Secure backend for local government and transit revenue collection."
-)
-
-# --- CORS CONFIGURATION (The Frontend Bridge) ---
+# THEN add middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
-    allow_methods=["*"], 
-    allow_headers=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# --- CONFIGURATION ---
-CLIENT_ID = os.getenv("INTERSWITCH_CLIENT_ID", "").strip()
-SECRET_KEY = os.getenv("INTERSWITCH_SECRET_KEY", "").strip()
+# Your existing routes go here
+@app.get("/")
+async def root():
+    return {"message": "CivicPay Shield API is running"}
 
-JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback_secret")
-ALGORITHM = "HS256"
-
-# --- SECURITY UTILITIES ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer()
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
-
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
-    token = credentials.credentials
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
-    user = db.query(UserDB).filter(UserDB.email == email).first()
-    if user is None:
-        raise credentials_exception
-    return user
-
-def get_interswitch_access_token():
-    # 1. Grab your secret keys securely from the .env file
-    client_id = os.getenv("INTERSWITCH_CLIENT_ID").strip()
-    secret_key = os.getenv("INTERSWITCH_SECRET_KEY").strip()
-
-    print(f"DEBUG CHECK - Client ID ends in: {str(client_id)[-4:]}")
-    print(f"DEBUG CHECK - Secret Key ends in: {str(secret_key)[-4:]}")
-
-    if not client_id or not secret_key:
-        raise HTTPException(status_code=500, detail="Interswitch credentials missing in environment.")
-
-    # 2. Interswitch requires the keys to be combined and Base64 encoded
-    auth_string = f"{client_id}:{secret_key}"
-    encoded_auth = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
-
-    # 3. Prepare the request
-    url = "https://sandbox.interswitchng.com/passport/oauth/token"
-    headers = {
-        "Authorization": f"Basic {encoded_auth}",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json"
-    }
-    payload = {"grant_type": "client_credentials"}
-
-    # 4. Knock on Interswitch's door
-    try:
-        response = requests.post(url, headers=headers, data=payload)
-        response.raise_for_status()  # This will trigger the exception below if they reject us
-        
-        # 5. Success! Extract the golden ticket
-        return response.json().get("access_token")
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Interswitch Auth Error: {e}")
-        raise HTTPException(status_code=502, detail="Failed to securely connect to Interswitch servers.")
-
-# --- MODELS ---
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    role: str = "citizen" 
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-class PaymentRequest(BaseModel):
-    email: EmailStr
-    amount: float
-    levy_type: str
-
-# --- AUTHENTICATION ENDPOINTS ---
 @app.post("/api/auth/register")
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(UserDB).filter(UserDB.email == user.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered.")
-
-    hashed_pwd = get_password_hash(user.password)
-    new_user = UserDB(email=user.email, hashed_password=hashed_pwd, role=user.role)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return {"status": "success", "message": f"New {user.role} account created successfully."}
+async def register():
+    # Your registration logic here
+    return {"message": "Registration endpoint"}
 
 @app.post("/api/auth/login")
-def login_user(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(UserDB).filter(UserDB.email == user.email).first()
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+async def login():
+    # Your login logic here
+    return {"message": "Login endpoint"}
 
-    token_data = {"sub": db_user.email, "role": db_user.role}
-    access_token = create_access_token(token_data)
-
-    return {"status": "success", "access_token": access_token, "token_type": "bearer", "role": db_user.role}
-
-# --- PAYMENT ENDPOINTS ---
 @app.post("/api/payments/initialize")
-def initialize_payment(request: PaymentRequest, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
-    if request.amount <= 0:
-        raise HTTPException(status_code=400, detail="Invalid payment amount.")
+async def initialize_payment():
+    # Your payment initialization logic here
+    return {"message": "Payment initialization endpoint"}
 
-    transaction_ref = f"CIVIC-{uuid.uuid4().hex[:8].upper()}"
-
-    new_transaction = TransactionDB(
-        email=request.email,
-        amount=request.amount,
-        levy_type=request.levy_type,
-        transaction_ref=transaction_ref,
-        status="pending"
-    )
-    db.add(new_transaction)
-    db.commit()
-    db.refresh(new_transaction)
-
-    # TODO: Make the actual HTTP POST request to Interswitch servers here once dashboard is back online
-    
-    return {
-        "status": "success",
-        "message": "Payment initialized and saved to database securely.",
-        "transaction_reference": transaction_ref
-    }
-
-# HACKATHON BYPASS MODE
-# Set this to False later when Interswitch servers fix themselves!
-MOCK_INTERSWITCH = True 
-
-@app.get("/api/payments/verify/{transaction_ref}")
-def verify_payment(transaction_ref: str, db: Session = Depends(get_db)):
-    if MOCK_INTERSWITCH:
-        print("⚠️ USING MOCKED INTERSWITCH RESPONSE")
-        
-        # 1. Update your local database (Simulating a successful payment)
-        db_transaction = db.query(TransactionDB).filter(TransactionDB.transaction_ref == transaction_ref).first()
-        if db_transaction:
-            db_transaction.status = "paid"
-            db.commit()
-            
-        return {
-            "status": "success",
-            "message": "Payment securely verified (HACKATHON MOCK MODE).",
-            "transaction_reference": transaction_ref,
-            "interswitch_payload": {
-                "ResponseCode": "00", 
-                "Amount": 5000,
-                "PaymentDate": "2026-03-18T09:30:00"
-            }
-        }
-
-    # --- THE REAL CODE (Runs when MOCK_INTERSWITCH = False) ---
-    token = get_interswitch_access_token()
-    url = f"https://sandbox.interswitchng.com/api/v2/quickteller/transactions/query?transactionReference={transaction_ref}"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-    try:
-        response = requests.get(url, headers=headers)
-        interswitch_data = response.json()
-        return {
-            "status": "success",
-            "message": "Transaction securely verified with Interswitch.",
-            "transaction_reference": transaction_ref,
-            "interswitch_payload": interswitch_data
-        }
-    except requests.exceptions.RequestException as e:
-        print(f"Interswitch Verification Error: {e}")
-        raise HTTPException(status_code=502, detail="Could not reach Interswitch verification servers.")
-
-# --- ADMIN DASHBOARD ---
 @app.get("/api/admin/transactions")
-def get_all_transactions(db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
-    # Strict Security Check: Are they an admin?
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Forbidden: You do not have the required clearance to view this data.")
-
-    transactions = db.query(TransactionDB).order_by(TransactionDB.created_at.desc()).limit(50).all()
-
-    return {"status": "success", "total_records_returned": len(transactions), "data": transactions}
-
-# --- CITIZEN DASHBOARD ---
-@app.get("/api/payments/history")
-def get_citizen_history(db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
-    # 1. Strict Security Check: Ensure admins don't accidentally use the citizen portal
-    if current_user.role != "citizen":
-        raise HTTPException(status_code=403, detail="Forbidden: This portal is for citizens only.")
-
-    # 2. Query the database, filtering ONLY by the logged-in user's email
-    transactions = db.query(TransactionDB).filter(
-        TransactionDB.email == current_user.email
-    ).order_by(TransactionDB.created_at.desc()).all()
-
-    # 3. Return their personal receipt history
-    return {
-        "status": "success",
-        "message": "Personal payment history retrieved successfully.",
-        "total_records": len(transactions),
-        "data": transactions
-    }
+async def get_transactions():
+    # Your admin transactions logic here
+    return {"message": "Admin transactions endpoint"}

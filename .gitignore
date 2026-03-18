@@ -1,4 +1,18 @@
-venv/
+# Python
 __pycache__/
+*.pyc
+venv/
 .env
-civicpay.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
