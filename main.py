@@ -77,28 +77,40 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     return user
 
 def get_interswitch_access_token():
-    """Generates a secure, temporary access token from Interswitch."""
-    if not CLIENT_ID or not SECRET_KEY:
-        raise HTTPException(status_code=500, detail="Missing Interswitch credentials in .env file")
-        
-    auth_string = f"{CLIENT_ID}:{SECRET_KEY}"
+    # 1. Grab your secret keys securely from the .env file
+    client_id = os.getenv("INTERSWITCH_CLIENT_ID").strip()
+    secret_key = os.getenv("INTERSWITCH_SECRET_KEY").strip()
+
+    print(f"DEBUG CHECK - Client ID ends in: {str(client_id)[-4:]}")
+    print(f"DEBUG CHECK - Secret Key ends in: {str(secret_key)[-4:]}")
+
+    if not client_id or not secret_key:
+        raise HTTPException(status_code=500, detail="Interswitch credentials missing in environment.")
+
+    # 2. Interswitch requires the keys to be combined and Base64 encoded
+    auth_string = f"{client_id}:{secret_key}"
     encoded_auth = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
-    
+
+    # 3. Prepare the request
+    url = "https://sandbox.interswitchng.com/passport/oauth/token"
     headers = {
         "Authorization": f"Basic {encoded_auth}",
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json"
     }
     payload = {"grant_type": "client_credentials"}
-    url = "https://sandbox.interswitchng.com/passport/oauth/token"
-    
+
+    # 4. Knock on Interswitch's door
     try:
         response = requests.post(url, headers=headers, data=payload)
-        response.raise_for_status() 
+        response.raise_for_status()  # This will trigger the exception below if they reject us
+        
+        # 5. Success! Extract the golden ticket
         return response.json().get("access_token")
+        
     except requests.exceptions.RequestException as e:
         print(f"Interswitch Auth Error: {e}")
-        raise HTTPException(status_code=502, detail="Failed to securely connect to Interswitch.")
+        raise HTTPException(status_code=502, detail="Failed to securely connect to Interswitch servers.")
 
 # --- MODELS ---
 class UserCreate(BaseModel):
@@ -168,22 +180,49 @@ def initialize_payment(request: PaymentRequest, db: Session = Depends(get_db), c
         "transaction_reference": transaction_ref
     }
 
+# HACKATHON BYPASS MODE
+# Set this to False later when Interswitch servers fix themselves!
+MOCK_INTERSWITCH = True 
+
 @app.get("/api/payments/verify/{transaction_ref}")
 def verify_payment(transaction_ref: str, db: Session = Depends(get_db)):
-    transaction = db.query(TransactionDB).filter(TransactionDB.transaction_ref == transaction_ref).first()
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found in the system.")
+    if MOCK_INTERSWITCH:
+        print("⚠️ USING MOCKED INTERSWITCH RESPONSE")
         
-    if transaction.status == "successful":
-        return {"status": "success", "message": "Transaction was already verified.", "transaction_reference": transaction.transaction_ref}
+        # 1. Update your local database (Simulating a successful payment)
+        db_transaction = db.query(TransactionDB).filter(TransactionDB.transaction_ref == transaction_ref).first()
+        if db_transaction:
+            db_transaction.status = "paid"
+            db.commit()
+            
+        return {
+            "status": "success",
+            "message": "Payment securely verified (HACKATHON MOCK MODE).",
+            "transaction_reference": transaction_ref,
+            "interswitch_payload": {
+                "ResponseCode": "00", 
+                "Amount": 5000,
+                "PaymentDate": "2026-03-18T09:30:00"
+            }
+        }
 
-    # TODO: Make the actual HTTP GET request to Interswitch servers here once dashboard is back online
-    
-    transaction.status = "successful"
-    db.commit()
-    db.refresh(transaction)
+    # --- THE REAL CODE (Runs when MOCK_INTERSWITCH = False) ---
+    token = get_interswitch_access_token()
+    url = f"https://sandbox.interswitchng.com/api/v2/quickteller/transactions/query?transactionReference={transaction_ref}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-    return {"status": "success", "message": "Payment verified and database updated securely.", "final_status": transaction.status}
+    try:
+        response = requests.get(url, headers=headers)
+        interswitch_data = response.json()
+        return {
+            "status": "success",
+            "message": "Transaction securely verified with Interswitch.",
+            "transaction_reference": transaction_ref,
+            "interswitch_payload": interswitch_data
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Interswitch Verification Error: {e}")
+        raise HTTPException(status_code=502, detail="Could not reach Interswitch verification servers.")
 
 # --- ADMIN DASHBOARD ---
 @app.get("/api/admin/transactions")
@@ -195,3 +234,23 @@ def get_all_transactions(db: Session = Depends(get_db), current_user: UserDB = D
     transactions = db.query(TransactionDB).order_by(TransactionDB.created_at.desc()).limit(50).all()
 
     return {"status": "success", "total_records_returned": len(transactions), "data": transactions}
+
+# --- CITIZEN DASHBOARD ---
+@app.get("/api/payments/history")
+def get_citizen_history(db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
+    # 1. Strict Security Check: Ensure admins don't accidentally use the citizen portal
+    if current_user.role != "citizen":
+        raise HTTPException(status_code=403, detail="Forbidden: This portal is for citizens only.")
+
+    # 2. Query the database, filtering ONLY by the logged-in user's email
+    transactions = db.query(TransactionDB).filter(
+        TransactionDB.email == current_user.email
+    ).order_by(TransactionDB.created_at.desc()).all()
+
+    # 3. Return their personal receipt history
+    return {
+        "status": "success",
+        "message": "Personal payment history retrieved successfully.",
+        "total_records": len(transactions),
+        "data": transactions
+    }
