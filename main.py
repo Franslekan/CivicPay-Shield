@@ -5,6 +5,14 @@ import base64
 import requests
 import random
 
+from pydantic import BaseModel
+from typing import Optional
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    role: str
+    secret_code: Optional[str] = None  # Add this line!
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -141,18 +149,31 @@ class PaymentRequest(BaseModel):
 # --- AUTHENTICATION ENDPOINTS ---
 @app.post("/api/auth/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    
+    # --- SECURITY PATCH: Lock down privileged accounts ---
+    if user.role in ["admin", "collector"]:
+        # For the hackathon, we hardcode the master key. 
+        if user.secret_code != "CIVIC_VIP_2026":
+            raise HTTPException(
+                status_code=403, 
+                detail="Access Denied: Invalid security code for privileged role."
+            )
+    # --- END SECURITY PATCH ---
+
     existing_user = db.query(UserDB).filter(UserDB.email == user.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered.")
 
     hashed_pwd = get_password_hash(user.password)
-    new_user = UserDB(email=user.email, hashed_password=hashed_pwd, role=user.role)
+    # Default to citizen if they try to bypass with a weird role
+    safe_role = user.role if user.role in ["admin", "collector", "citizen"] else "citizen"
+    
+    new_user = UserDB(email=user.email, hashed_password=hashed_pwd, role=safe_role)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    return {"status": "success", "message": f"New {user.role} account created successfully."}
-
+    return {"status": "success", "message": f"New {safe_role} account created successfully."}
 @app.post("/api/auth/login")
 def login_user(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(UserDB).filter(UserDB.email == user.email).first()
