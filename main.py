@@ -3,6 +3,7 @@ import uuid
 import os
 import base64
 import requests
+import random
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,6 +44,10 @@ ALGORITHM = "HS256"
 # --- SECURITY UTILITIES ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+
+def generate_otp():
+    """Generates a secure 6-digit One Time Password."""
+    return str(random.randint(100000, 999999))
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -122,6 +127,12 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class PhoneRequest(BaseModel):
+    phone_number: str
+
+class OTPVerification(BaseModel):
+    otp_code: str
+
 class PaymentRequest(BaseModel):
     email: EmailStr
     amount: float
@@ -152,6 +163,41 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
     access_token = create_access_token(token_data)
 
     return {"status": "success", "access_token": access_token, "token_type": "bearer", "role": db_user.role}
+
+@app.post("/api/auth/send-otp")
+def send_otp(request: PhoneRequest, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
+    """Generates an OTP, saves it, and simulates sending an SMS."""
+    
+    # 1. Generate the secure 6-digit code
+    otp = generate_otp()
+    
+    # 2. Save their phone number and the secret code to the database
+    current_user.phone_number = request.phone_number
+    current_user.otp_code = otp
+    db.commit()
+    
+    # 3. MOCK SMS PROVIDER (Saves us money on Twilio/Termii during the hackathon!)
+    print("\n" + "=" * 50)
+    print(f"📱 NEW SMS TO {request.phone_number}:")
+    print(f"Your CivicPay Shield security code is: {otp}")
+    print("=" * 50 + "\n")
+    
+    return {"status": "success", "message": "OTP sent successfully. Check your phone (or terminal!)."}
+
+@app.post("/api/auth/verify-otp")
+def verify_otp(request: OTPVerification, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
+    """Checks if the citizen provided the correct OTP."""
+    
+    # 1. Did they guess wrong?
+    if not current_user.otp_code or current_user.otp_code != request.otp_code:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP.")
+        
+    # 2. They got it right! Upgrade their account security status
+    current_user.is_phone_verified = True
+    current_user.otp_code = None # Clear it out so it can't be used twice
+    db.commit()
+    
+    return {"status": "success", "message": "Phone number fully verified! Your account is secured."}
 
 # --- PAYMENT ENDPOINTS ---
 @app.post("/api/payments/initialize")

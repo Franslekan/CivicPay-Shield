@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
 import datetime
 
@@ -18,8 +19,12 @@ class UserDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    role = Column(String, default="citizen") # Can be 'citizen', 'field_collector', or 'admin'
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    role = Column(String, default="citizen")
+    
+    # --- NEW SECURITY & OTP FIELDS ---
+    phone_number = Column(String, nullable=True)
+    is_phone_verified = Column(Boolean, default=False)
+    otp_code = Column(String, nullable=True)
 
 # 2. The Transaction Table
 class TransactionDB(Base):
