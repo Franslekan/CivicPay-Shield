@@ -945,28 +945,6 @@ function CollectorDashboard({ session, onLogout }) {
     setL(false);
   };
 
-  const logCash = async()=>{
-    if(!cash.citizen_name.trim()||!cash.amount){return;}
-    setCashLoading(true);
-    let receipt = `RCT-${Date.now().toString().slice(-5)}`;
-    try {
-      const d = await apiFetch("/api/payments/initialize",{method:"POST",body:JSON.stringify({
-        payer_name:cash.citizen_name, levy_type:cash.levy_type,
-        amount:+cash.amount, payment_method:"cash",
-        phone:cash.phone, collected_by:user?.name||"Collector",
-      })},token);
-      if(d.reference) receipt = d.reference;
-    } catch (e) {
-        console.error("Cash log failed on backend", e);
-    }
-    
-    setCashOk({...cash,amount:+cash.amount,receipt});
-    // Add to local txn list temporarily for UI update
-    setTxns(p=>[{id:receipt,receipt_id:receipt,levy_type:cash.levy_type,amount:+cash.amount,payer_name:cash.citizen_name,status:"paid",created_at:new Date().toISOString()},...p]);
-    setStats(p=>({...p,total_volume:p.total_volume+(+cash.amount),transaction_count:p.transaction_count+1,verified_count:p.verified_count+1}));
-    setCashLoading(false);
-  };
-
   const logCash = async () => {
     if (!cash.citizen_name.trim() || !cash.amount) { setCashErr("Name and amount are required."); return; }
     setCashLoading(true); setCashErr("");
@@ -979,8 +957,14 @@ function CollectorDashboard({ session, onLogout }) {
           phone: cash.phone, collected_by: user?.name || "Collector",
         }),
       }, token);
-      setCashOk({ ...cash, amount: +cash.amount, receipt: d.receipt_id });
-      fetchTxns();
+      setCashOk({ ...cash, amount: +cash.amount, receipt: d.reference || d.receipt_id || `CIVIC-${Date.now().toString().slice(-5)}` });
+      
+      // Refresh the table with the new data
+      apiFetch("/api/admin/transactions",{},token).then(data => {
+          setTxns(data.transactions || data || []);
+          if (data.stats) setStats(data.stats);
+      }).catch(()=>{});
+
     } catch (e) {
       setCashErr(e.message || "Failed to record payment.");
     } finally {
