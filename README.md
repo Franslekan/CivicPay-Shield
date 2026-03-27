@@ -1,30 +1,69 @@
-# CivicPay-Shield
-A secure, civic-tech payment gateway digitizing local government and transit revenue collection. Built for the Enyata x Interswitch Buildathon 2026.
 # 🛡️ CivicPay Shield
-**Enyata x Interswitch Buildathon 2026 Submission**
 
-CivicPay Shield is a highly secure, digitized payment portal designed specifically for local governance and transport unions to collect daily levies transparently, eliminating revenue leakage and the physical risks of handling cash.
+**Secure, transparent, and digitized government levy collection for the informal economy.**
+*Built for the Enyata × Interswitch Buildathon 2026*
 
-### ⚠️ The Problem
-Informal sector revenue collection (such as transit dues, market levies, and local government fees) relies heavily on paper tickets and cash. This manual workflow results in massive revenue leakage, lack of transparency, audit blindspots, and physical security risks for the collectors.
+---
 
-### 💡 The Solution
-CivicPay Shield modernizes this administrative workflow. We provide a transparent, role-based digital gateway where citizens can securely pay their levies, and government/union administrators can track revenue in real-time. 
+## 🌍 The Problem
+In many developing economies, local government revenue collection relies heavily on cash transactions managed by street-level agents (collecting from market vendors, transport workers, etc.). This manual process leads to massive **cash leakage, counterfeit paper receipts, and a complete lack of real-time financial transparency** for local governments.
 
-### ✨ Key Features
-* **Interswitch Integration:** Seamless and secure payment processing utilizing Interswitch's robust infrastructure.
-* **Role-Based Access Control (RBAC):** Distinct, secure dashboards tailored for Citizens, Field Collectors, and System Administrators to ensure data integrity.
-* **Real-Time Audit Trails:** Immutable transaction logs designed to meet public sector compliance and transparency standards.
-* **Fraud Prevention:** Built with strict session management and data validation to prevent unauthorized fund diversion.
+## 💡 The Solution
+**CivicPay Shield** completely digitizes the local levy ecosystem. By combining a self-service Citizen Portal with a dedicated Collector Terminal, we ensure every single Naira collected is instantly logged, verified, and vaulted. 
 
-### 🛠️ Tech Stack
-* **Backend:** Python 
-* **Frontend:** TBD
-* **Database:** TBD
-* **Payments:** Interswitch API
+Every transaction is secured with OTP verification and processed via **Interswitch**, bridging the gap between informal cash economies and secure digital banking.
 
-### 👥 The Team
-* **Frans Anthony** - Backend & Security Lead
-* **Blackiee** - Frontend Developer
-* **Abdul-Rahman** - UI/UX Designer
-* **Toyibat** - Product Manager
+---
+
+## ✨ Key Features & Role-Based Access Control (RBAC)
+
+* **👤 The Citizen Portal:** Allows individuals to log in, view their levy history, and securely pay local taxes (Transport, Market, Signage) directly via card or bank transfer.
+* **🔍 The Collector Terminal:** A dedicated mobile-first interface for street-level government agents to log physical cash payments. It instantly generates a digital receipt for the citizen, eliminating fake paper tickets.
+* **⚙️ The Admin Dashboard:** Real-time revenue tracking. Local government chairmen can view live collection volumes, verify receipts, and track exact payment flows across the municipality.
+
+## 🛠️ Tech Stack Architecture
+* **Frontend:** React, Vite, Custom CSS (Dark-mode optimized for outdoor visibility)
+* **Backend:** Python, FastAPI, SQLAlchemy
+* **Database:** SQLite 
+* **Authentication:** JWT (JSON Web Tokens) with strictly enforced RBAC and VIP Passcode lockouts for privileged accounts.
+* **Payment Gateway:** Interswitch (Mock Integration)
+* **Deployment:** Render (Backend API)
+
+---
+
+## 🚀 How to Run Locally
+
+**1. Clone the repository**
+\`\`\`bash
+git clone https://github.com/Franslekan/CivicPay-Shield.git
+cd CivicPay-Shield
+\`\`\`
+
+**2. Start the FastAPI Backend**
+\`\`\`bash
+# Create a virtual environment and install dependencies
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Run the backend server
+uvicorn main:app --reload
+\`\`\`
+
+**3. Start the React Frontend**
+\`\`\`bash
+cd frontend
+npm install
+npm run dev
+\`\`\`
+
+**4. Demo Credentials**
+* **Citizen:** Create a new account or use `citizen@example.com`
+* **Collector/Admin Creation:** Requires the Master VIP Passcode: `CIVIC_VIP_2026`
+
+---
+## 👥 The Team
+* **Frans Olamilekan Anthony** – Tech Lead & Backend Architecture (FastAPI, Python, DB)
+* **Blakkie** – Frontend Engineer (React, Vite, CSS)
+* **Abdul Rahman** - UI/UX Design (Canva)
+* **Toyibat** - Project Manajer (Slack, Trello)
