@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 // ✅ STEP 1: Set this to your backend URL
 // Local dev:  "http://localhost:8000"
 // Production: "https://civicpay-shield.onrender.com"
-const API_BASE = "http://localhost:8000";
-
+const API_BASE = "https://civicpay-shield.onrender.com";
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const fmt = n => new Intl.NumberFormat("en-NG",{style:"currency",currency:"NGN",maximumFractionDigits:0}).format(n);
 const fmtDate = d => new Date(d).toLocaleDateString("en-NG",{day:"numeric",month:"short",year:"numeric"});
