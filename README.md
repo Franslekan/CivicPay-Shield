@@ -1,313 +1,69 @@
-# CivicPay Shield 🛡️
+# 🛡️ CivicPay Shield
 
-> **Enyata × Interswitch Buildathon 2026**  
-> A secure, real-time government levy payment and verification platform built for citizens and revenue collectors.
-
----
-
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Frontend Setup](#frontend-setup)
-- [Environment Variables](#environment-variables)
-- [API Reference](#api-reference)
-- [User Roles](#user-roles)
-- [Screenshots](#screenshots)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
-- [License](#license)
+**Secure, transparent, and digitized government levy collection for the informal economy.**
+*Built for the Enyata × Interswitch Buildathon 2026*
 
 ---
 
-## Overview
+## 🌍 The Problem
+In many developing economies, local government revenue collection relies heavily on cash transactions managed by street-level agents (collecting from market vendors, transport workers, etc.). This manual process leads to massive **cash leakage, counterfeit paper receipts, and a complete lack of real-time financial transparency** for local governments.
 
-CivicPay Shield is a full-stack web application that digitises the collection and verification of government levies in Nigeria. It eliminates cash leakage, provides a tamper-proof audit trail, and gives revenue collectors real-time tools to verify citizen payments on the spot — via QR code or receipt ID.
+## 💡 The Solution
+**CivicPay Shield** completely digitizes the local levy ecosystem. By combining a self-service Citizen Portal with a dedicated Collector Terminal, we ensure every single Naira collected is instantly logged, verified, and vaulted. 
 
-Built for the **Enyata × Interswitch Buildathon 2026**, it is powered by **Interswitch's payment infrastructure** and secured with **JWT authentication** and **256-bit TLS encryption**.
-
----
-
-## Features
-
-### 👤 Citizen
-- Register and log in securely
-- Pay levies online (Transport, Market, Signage, Waste, Development)
-- Choose from preset amounts or enter a custom value
-- Authorise payments via a 6-digit OTP
-- View full transaction history with receipts
-- Real-time payment status tracking
-
-### 🔍 Collector
-- Verify citizen payments by scanning a QR code or entering a receipt ID
-- Approve or flag suspicious transactions
-- Log street-level cash collections on behalf of citizens
-- View all transactions with live aggregate stats (total volume, pending, verified)
-- Full audit trail with collector name and timestamp
-
-### 🔒 Security
-- Bcrypt password hashing
-- JWT access tokens (24-hour expiry)
-- Role-based access control (citizen / collector / admin)
-- CORS protection configured per environment
-- Collector registration gated behind a secret passcode
+Every transaction is secured with OTP verification and processed via **Interswitch**, bridging the gap between informal cash economies and secure digital banking.
 
 ---
 
-## Tech Stack
+## ✨ Key Features & Role-Based Access Control (RBAC)
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | React 18, Vite, CSS-in-JS |
-| **Backend** | FastAPI (Python 3.11+) |
-| **Database** | SQLite (local) / PostgreSQL (production) |
-| **Auth** | JWT via `python-jose`, bcrypt password hashing |
-| **ORM** | SQLAlchemy 2.0 |
-| **Payments** | Interswitch Payment Gateway |
-| **Hosting** | Render (backend) / Vercel (frontend) |
+* **👤 The Citizen Portal:** Allows individuals to log in, view their levy history, and securely pay local taxes (Transport, Market, Signage) directly via card or bank transfer.
+* **🔍 The Collector Terminal:** A dedicated mobile-first interface for street-level government agents to log physical cash payments. It instantly generates a digital receipt for the citizen, eliminating fake paper tickets.
+* **⚙️ The Admin Dashboard:** Real-time revenue tracking. Local government chairmen can view live collection volumes, verify receipts, and track exact payment flows across the municipality.
 
----
-
-## Project Structure
-
-```
-CivicPay-Shield/
-├── civicpay/                  # Backend (FastAPI)
-│   ├── main.py                # App entry point + CORS config
-│   ├── requirements.txt       # Python dependencies
-│   ├── .env                   # Environment variables (local only)
-│   ├── core/
-│   │   ├── database.py        # SQLAlchemy engine + session + init_db
-│   │   └── security.py        # JWT + bcrypt helpers + auth dependencies
-│   ├── models/
-│   │   ├── user.py            # User table
-│   │   └── transaction.py     # Transaction table
-│   └── routers/
-│       ├── auth.py            # POST /api/auth/register & /login
-│       ├── payments.py        # GET /history, POST /initialize, GET /verify/{id}
-│       └── admin.py           # GET /transactions, POST /approve & /flag
-│
-└── frontend/                  # Frontend (React + Vite)
-    ├── index.html
-    ├── src/
-    │   ├── main.jsx           # React entry point
-    │   ├── index.css          # Global reset styles
-    │   └── App.jsx            # CivicPayShield root component
-    └── package.json
-```
+## 🛠️ Tech Stack Architecture
+* **Frontend:** React, Vite, Custom CSS (Dark-mode optimized for outdoor visibility)
+* **Backend:** Python, FastAPI, SQLAlchemy
+* **Database:** SQLite 
+* **Authentication:** JWT (JSON Web Tokens) with strictly enforced RBAC and VIP Passcode lockouts for privileged accounts.
+* **Payment Gateway:** Interswitch (Mock Integration)
+* **Deployment:** Render (Backend API)
 
 ---
 
-## Getting Started
+## 🚀 How to Run Locally
 
-### Prerequisites
+**1. Clone the repository**
+\`\`\`bash
+git clone https://github.com/Franslekan/CivicPay-Shield.git
+cd CivicPay-Shield
+\`\`\`
 
-Make sure you have the following installed:
-
-- **Python 3.11+** — `python3 --version`
-- **Node.js 18+** — `node --version`
-- **npm or yarn** — `npm --version`
-
----
-
-### Backend Setup
-
-```bash
-# 1. Navigate into the backend folder
-cd CivicPay-Shield/civicpay
-
-# 2. Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# 3. Install dependencies
+**2. Start the FastAPI Backend**
+\`\`\`bash
+# Create a virtual environment and install dependencies
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
 
-# 4. Configure environment variables
-cp .env .env.local              # Edit values as needed (see Environment Variables below)
+# Run the backend server
+uvicorn main:app --reload
+\`\`\`
 
-# 5. Start the development server
-uvicorn main:app --reload --port 8000
-```
-
-The API will be live at **http://localhost:8000**  
-Interactive docs (Swagger UI) at **http://localhost:8000/docs**
-
----
-
-### Frontend Setup
-
-```bash
-# 1. Navigate into the frontend folder
-cd CivicPay-Shield/frontend     # or wherever your React project lives
-
-# 2. Install dependencies
+**3. Start the React Frontend**
+\`\`\`bash
+cd frontend
 npm install
-
-# 3. Set the backend URL
-# Open src/App.jsx and confirm this line at the top:
-# const API_BASE = "http://localhost:8000";
-
-# 4. Start the development server
 npm run dev
-```
+\`\`\`
 
-The app will be live at **http://localhost:5173**
-
----
-
-## Environment Variables
-
-Create a `.env` file inside the `civicpay/` folder with the following values:
-
-```env
-# Database — SQLite for local dev (file auto-created), swap for PostgreSQL in production
-DATABASE_URL=sqlite:///./civicpay.db
-
-# JWT secret — use a long random string in production
-SECRET_KEY=your_secret_key_here
-
-# Token lifetime in minutes (default: 1440 = 24 hours)
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-
-# Passcode required when registering a Collector account
-# Share this with authorised collectors only
-COLLECTOR_SECRET=civicpay2026
-```
-
-> ⚠️ Never commit your `.env` file to version control. It is already listed in `.gitignore`.
+**4. Demo Credentials**
+* **Citizen:** Create a new account or use `citizen@example.com`
+* **Collector/Admin Creation:** Requires the Master VIP Passcode: `CIVIC_VIP_2026`
 
 ---
-
-## API Reference
-
-### Auth
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `POST` | `/api/auth/register` | Create a new citizen or collector account | None |
-| `POST` | `/api/auth/login` | Log in and receive a JWT token | None |
-
-### Payments
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `GET` | `/api/payments/history` | Get logged-in citizen's transaction history | Citizen |
-| `POST` | `/api/payments/initialize` | Create a new levy payment | Any |
-| `GET` | `/api/payments/verify/{receipt_id}` | Verify a payment by receipt ID | Any |
-
-### Admin (Collector only)
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `GET` | `/api/admin/transactions` | Get all transactions + aggregate stats | Collector |
-| `POST` | `/api/admin/transactions/{id}/approve` | Approve a transaction | Collector |
-| `POST` | `/api/admin/transactions/{id}/flag` | Flag a transaction for review | Collector |
-
-### Example: Login Request
-
-```json
-POST /api/auth/login
-{
-  "identifier": "citizen@example.com",
-  "password": "yourpassword",
-  "role": "citizen"
-}
-```
-
-### Example: Login Response
-
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "user": {
-    "id": "uuid-here",
-    "name": "John Doe",
-    "email": "citizen@example.com",
-    "role": "citizen"
-  }
-}
-```
-
----
-
-## User Roles
-
-### Citizen
-Register at `/register` with role set to **Citizen**.  
-No special passcode required.
-
-### Collector
-Register at `/register` with role set to **Collector**.  
-You will be prompted for a **VIP Security Passcode** — this must match the `COLLECTOR_SECRET` value in the backend `.env` file (default for local dev: `civicpay2026`).
-
-> In production, only share this passcode with authorised revenue collectors via a secure channel.
-
----
-
-## Deployment
-
-### Backend (Render)
-
-1. Push your code to GitHub
-2. Create a new **Web Service** on [Render](https://render.com)
-3. Set the build command: `pip install -r requirements.txt`
-4. Set the start command: `uvicorn main:app --host 0.0.0.0 --port 8000`
-5. Add your environment variables in the Render dashboard
-6. Switch `DATABASE_URL` to a PostgreSQL connection string
-
-### Frontend (Vercel)
-
-1. Import your GitHub repo on [Vercel](https://vercel.com)
-2. Set the root directory to your frontend folder
-3. Update `API_BASE` in `src/App.jsx` to your Render backend URL:
-   ```js
-   const API_BASE = "https://your-app.onrender.com";
-   ```
-4. Deploy — Vercel handles the rest automatically
-
-### Update CORS for Production
-
-In `civicpay/main.py`, add your Vercel frontend URL to `allow_origins`:
-
-```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://your-app.vercel.app",   # ← add this
-    ],
-    ...
-)
-```
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature-name`
-3. Commit your changes: `git commit -m "feat: add your feature"`
-4. Push to the branch: `git push origin feat/your-feature-name`
-5. Open a Pull Request
-
-Please follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
-
----
-
-## License
-
-This project was built for the **Enyata × Interswitch Buildathon 2026**.  
-© 2026 CivicPay Shield. All rights reserved.
-
----
-
-<div align="center">
-  <sub>Built with ❤️ · Secured by Interswitch · 256-bit TLS</sub>
-</div>
+## 👥 The Team
+* **Frans Olamilekan Anthony** – Tech Lead & Backend Architecture (FastAPI, Python, DB)
+* **Blakkie** – Frontend Engineer (React, Vite, CSS)
+* **Abdul Rahman** - UI/UX Design (Canva)
+* **Toyibat** - Project Manajer (Slack, Trello)
